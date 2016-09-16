@@ -1,0 +1,50 @@
+@import 'https://fonts.googleapis.com/css?family=Kreon:400,700|Pacifico';
+
+body {
+  font-family: 'Kreon', serif;
+}
+.sound-cloud {
+  background: #EB3349;
+  background: -webkit-linear-gradient(to left, #EB3349 , #F45C43);
+  background: linear-gradient(to left, #EB3349 , #F45C43);
+  color: #fff;
+}
+a {
+  color: #fff;
+  text-decoration: none;
+}
+h1 {
+  font-family: 'Pacifico', cursive;
+}
+ul li {
+  line-height: 40px;
+}
+.avatar img {
+  width: 150px;
+  border-radius: 50%;
+}
+.flex-container {
+  display: -webkit-flex;
+  display: flex;
+}
+.flex-left {
+  -webkit-flex: initial;
+  flex: initial;
+  width: 800px;
+}
+.flex-right {
+  -webkit-flex: 1;
+  flex: 1;
+}
+.remark-slide-number {
+  display: none;
+}
+.remark-slide-content h1 {
+  text-shadow: 0px 5px 0px #DD4C27;
+  font-size: 65px;
+}
+.remark-slide-content h3 {
+  font-family: 'Kreon', serif;
+  font-weight: 700;
+  text-shadow: 0px 5px 0px #DD4C27;
+}

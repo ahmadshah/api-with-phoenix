@@ -1,0 +1,40 @@
+name: inverse
+layout: true
+class: center, middle, sound-cloud
+---
+#API with Phoenix
+###Elixir Dev Malaysia Meetup
+---
+layout: false
+class: sound-cloud, top
+.flex-container[
+  .flex-left[
+  ###$ WHOAMI
+
+  * Ahmad Shah Hafizan Hamidin
+  * iCommerce Asia Private Limited (http://www.icommerce.asia)
+  * Was doing PHP for the past 8 years and started with Elixir few months back
+  * https://github.com/ahmadshah
+  * https://twitter.com/penjajah
+  ]
+  .flex-right[
+  .avatar.right[![kids](https://scontent-kul1-1.xx.fbcdn.net/v/l/t1.0-9/13423919_1224356757574349_1786878363131590733_n.jpg?oh=bca01340f7d57ffeef2889ea1f60d881&oe=586FC6A8)]
+  ]
+]
+---
+layout: false
+class: sound-cloud, top
+.flex-container[
+  .flex-left[
+  ###What to Expect?
+
+  * Setting up Phoenix Framework for API
+  * JWT authentication with **Guardian**
+  * Serializing response to **JSONAPI** specification
+  ]
+]
+---
+class: sound-cloud, middle, center
+
+#Let's Begin
+### $ mix phoenix.new passport --no-brunch --no-html

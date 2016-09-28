@@ -18,7 +18,9 @@
     <script src="<%= static_path(@conn, "/js/remark.min.js") %>"></script>
     <script>
       var slideshow = remark.create({
-        ratio: '16:9'
+        ratio: '16:9',
+        highlightLanguage: 'elixir',
+        highlightStyle: 'monokai'
       });
     </script>
   </body>

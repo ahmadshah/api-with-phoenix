@@ -6,7 +6,7 @@ class: center, middle, sound-cloud
 ###Elixir Dev Malaysia Meetup
 ---
 layout: false
-class: sound-cloud, top
+class: sound-cloud, middle
 .flex-container[
   .flex-left[
   ###$ WHOAMI
@@ -18,12 +18,11 @@ class: sound-cloud, top
   * https://twitter.com/penjajah
   ]
   .flex-right[
-  .avatar.right[![kids](https://scontent-kul1-1.xx.fbcdn.net/v/l/t1.0-9/13423919_1224356757574349_1786878363131590733_n.jpg?oh=bca01340f7d57ffeef2889ea1f60d881&oe=586FC6A8)]
   ]
 ]
 ---
 layout: false
-class: sound-cloud, top
+class: sound-cloud, middle
 .flex-container[
   .flex-left[
   ###What to Expect?
@@ -36,5 +35,311 @@ class: sound-cloud, top
 ---
 class: sound-cloud, middle, center
 
-#Let's Begin
-### $ mix phoenix.new passport --no-brunch --no-html
+![phoenix](https://files.readme.io/PKPqx8L9TJSAY2Bnmw7F_phoenixframework-logo-white@2x.png)
+---
+class: middle
+#### Phoenix App
+
+```elixir
+$ mix phoenix.new demo --no-brunch --no-html --database mysql
+```
+
+* Configure the **dev** and **test** database
+
+```elixir
+$ mix ecto.create
+```
+---
+class: middle
+
+#### Packages
+
+```elixir
+defp deps do
+  [...
+  {:comeonin, "~> 2.5"},
+  {:guardian, "~> 0.12"},
+  {:ja_serializer, "~> 0.11"},
+  {:ex_machina, "~> 1.0", only: :test}]
+end
+```
+---
+class: top
+
+#### User Model (part-1)
+
+```elixir
+defmodule Demo.User do
+  use Demo.Web, :model
+
+  import Comeonin.Bcrypt, only: [hashpwsalt: 1]
+
+  schema "users" do
+    field :email, :string
+    field :original_password, :string, virtual: true
+    field :password, :string
+    field :first_name, :string
+    field :last_name, :string
+    timestamps
+  end
+```
+---
+#### User Model (part-2)
+
+```elixir
+  @required_fields ~w(email original_password first_name last_name)
+  @optional_fields ~w()
+
+  def changeset(model, params \\ :empty) do
+    model
+    |> cast(params, @required_fields, @optional_fields)
+    |> hash_password(params[:original_password])
+    |> validate_length(:original_password, min: 6)
+    |> unique_constraint(:email)
+  end
+
+  defp hash_password(changeset, password) when is_nil(password) == false,
+    do: put_change(changeset, :password, hashpwsalt(password))
+
+  defp hash_password(changeset, _), do: changeset
+end
+```
+---
+class: sound-cloud, middle, center
+
+# enter the Guardian
+### Securing our API enpoints
+---
+class: top
+#### Authenticator Service
+
+```elixir
+defmodule Demo.AuthenticatorService do
+  import Comeonin.Bcrypt, only: [checkpw: 2]
+
+  alias Demo.{Repo, User}
+
+  def authenticate(email, password) do
+    try do
+      user = Repo.get_by!(User, email: email)
+      case checkpw(password, user.password) do
+        false -> {:error, :user_not_found}
+        true -> {:ok, user}
+      end
+    rescue
+      Ecto.NoResultsError -> {:error, :user_not_found}
+    end
+  end
+end
+```
+---
+#### Testing Our Authenticator Service
+
+```elixir
+defmodule Demo.AuthenticatorServiceTest do
+  use Demo.ModelCase
+
+  import Demo.Factory
+
+  alias Demo.AuthenticatorService
+
+  test "authenticate user" do
+    insert(:user) #ExMachina
+
+    assert {:error, :user_not_found} = AuthenticatorService.authenticate("foo@bar.com", "123456789")
+
+    {:ok, user} = AuthenticatorService.authenticate("foo@bar.com", "123456")
+
+    assert "foo@bar.com" = user.email
+  end
+
+  test "authenticate non-existing user" do
+    assert {:error, :user_not_found} = AuthenticatorService.authenticate("foo@bar.com", "123456")
+  end
+end
+```
+---
+#### Putting It To Use : [POST /authenticate]
+
+```elixir
+defmodule Demo.AuthController do
+  use Demo.Web, :controller
+
+  alias Demo.AuthenticatorService
+
+  def login(conn, %{"email" => email, "password" => password}) do
+    case AuthenticatorService.authenticate(email, password) do
+      {:error, reason} -> #handle unauthenticated response
+      {:ok, user} ->
+        conn = Guardian.Plug.api_sign_in(conn, user)
+        {:ok, claims} = Guardian.Plug.claims(conn)
+        jwt = Guardian.Plug.current_token(conn)
+
+        render(conn, "login.json", %{id: user.id, token: jwt, expired_at: claims["exp"]})
+    end
+  end
+end
+```
+---
+#### Serializing Our Response
+
+```elixir
+defmodule Demo.JwtSerializer do
+  use JaSerializer
+
+  attributes [:token, :expired_at]
+end
+```
+
+```elixir
+defmodule Demo.AuthView do
+  use Demo.Web, :view
+
+  def render("login.json", data),
+    do: JaSerializer.format(Demo.JwtSerializer, data)
+end
+```
+
+```javascrtipt
+data: {
+  id: 1
+  attributes: {
+    token: //jwt token
+    expired-at: //timestamp
+  }
+}
+
+```
+---
+#### Testing Our Controller
+
+```elixir
+defmodule Demo.AuthControllerTest do
+  use Demo.ConnCase
+
+  import Demo.Factory
+
+  setup do
+    insert(:user)
+    :ok
+  end
+
+  test "authenticate user and generate json web token" do
+    response =
+      build_conn
+      |> post("/api/authenticate", [email: "foo@bar.com", password: "123456"])
+      |> json_response(200)
+
+    assert_response_attributes(response, ["expired-at", "token"])
+    assert String.match?(fetch_node(response, "data.attributes.token"), ~r/[a-zA-Z0-9-_.]/)
+    assert is_integer(fetch_node(response, "data.attributes.expired-at"))
+
+    refute is_nil(fetch_node(response, "data.id"))
+  end
+end
+```
+---
+#### Assertion Macros
+```elixir
+defmodule Demo.Assertion do
+  defmacro fetch_node(map, node) do
+    quote do
+      String.split(unquote(node), ".")
+      |> Enum.reduce(unquote(map), fn(n, m) -> Map.get(m, n) end)
+    end
+  end
+
+  defmacro assert_contains(struct, keys) do
+    quote do
+      Map.from_struct(unquote(struct))
+      |> Map.keys
+      |> Enum.each(fn(key) -> assert Enum.member?(unquote(keys), key) end)
+    end
+  end
+
+  defmacro assert_response_attributes(response, keys) do
+    quote do
+      attributes =
+        fetch_node(unquote(response), "data.attributes")
+        |> Map.keys
+
+      Enum.each(attributes, fn(attr) -> assert Enum.member?(unquote(keys), attr) end)
+    end
+  end
+end
+```
+---
+class: sound-cloud, middle, center
+# Refactoring
+---
+class: middle
+
+#### Maybe We Can Change This
+
+* **AuthController** are doing more than handling request and response
+* We need a token service to manage JWT functionalities such as refresh or revoke
+* Token response is a map instead of a struct
+---
+class: top
+
+#### JWT struct
+
+```elixir
+defmodule Demo.Jwt do
+  defstruct [:id, :token, :expired_at]
+end
+```
+---
+class: top
+#### Token Service
+
+```elixir
+defmodule Demo.TokenService do
+  alias Demo.Jwt
+
+  def grant(conn, user) do
+    conn = Guardian.Plug.api_sign_in(conn, user)
+    token = %Jwt{
+      id: user.id,
+      token: fetch_jwt(conn)
+      expired_at: fetch_claims(conn, "exp")
+    }
+
+    {:ok, conn, token}
+  end
+
+  defp fetch_claims(conn, key) when is_nil(key) == false,
+    do: fetch_claims(conn)[key]
+
+  defp fetch_claims(conn, _) do
+    {:ok, claims} = Guardian.Plug.claims(conn)
+    claims
+  end
+
+  defp fetch_jwt(conn), do: Guardian.Plug.current_token(conn)
+end
+```
+---
+#### Auth Controller
+```elixir
+defmodule Demo.AuthController do
+  use Demo.Web, :controller
+
+  alias Demo.TokenService
+  alias Demo.AuthenticatorService
+
+  def login(conn, %{"email" => email, "password" => password}) do
+    case AuthenticatorService.authenticate(email, password) do
+      {:error, reason} -> #handle unauthenticated response
+      {:ok, user} ->
+        {;ok, conn, token} = TokenService.grant(conn, user)
+        render(conn, "login.json", token)
+    end
+  end
+end
+```
+---
+class: sound-cloud, middle, center
+
+# Thanks!
+### http://bit.ly/api-phoenix-demo
